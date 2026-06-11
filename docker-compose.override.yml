@@ -1,0 +1,28 @@
+# Local dev override — build from source, default features only (oss_core,python).
+# Keeps docker-compose.yml pristine vs upstream so `git merge upstream/<tag>` stays clean.
+# Build once (server), reuse the windmill:dev image for the other job services.
+services:
+  windmill_server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        features: "oss_core,python"
+    image: windmill:dev
+    pull_policy: never
+    ports: ["127.0.0.1:8000:8000"]
+
+  windmill_worker:
+    image: windmill:dev
+    pull_policy: never
+
+  windmill_worker_native:
+    image: windmill:dev
+    pull_policy: never
+
+  # Prebuilt EE-registry images — keep off by default (build-from-source discipline).
+  windmill_extra:
+    profiles: ["extra"]
+
+  caddy:
+    profiles: ["proxy"]

@@ -1,0 +1,3 @@
+[submodule "reference/windmill"]
+	path = reference/windmill
+	url = https://github.com/windmill-labs/windmill

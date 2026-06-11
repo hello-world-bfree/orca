@@ -1,0 +1,4 @@
+# Class 1 — files we own wholesale; never take upstream's version on merge.
+# Requires (per clone, not committed):  git config merge.ours.driver true
+/CLAUDE.md               merge=ours
+frontend/static/logo.svg merge=ours
