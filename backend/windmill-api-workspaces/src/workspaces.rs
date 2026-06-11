@@ -2462,9 +2462,6 @@ fn cleanup_legacy_git_sync_settings_in_memory(
     }
 }
 
-#[cfg(not(feature = "enterprise"))]
-const CE_GIT_SYNC_MAX_USERS: i64 = 2;
-
 #[cfg(feature = "enterprise")]
 async fn check_git_sync_access(_db: &DB, _w_id: &str) -> Result<()> {
     Ok(())
@@ -2483,22 +2480,7 @@ async fn _sqlx_anchor_ce_user_count(db: &DB, w_id: &str) {
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn check_git_sync_access(db: &DB, w_id: &str) -> Result<()> {
-    let user_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM usr WHERE workspace_id = $1 AND disabled = false",
-        w_id
-    )
-    .fetch_one(db)
-    .await?
-    .unwrap_or(0);
-
-    if user_count > CE_GIT_SYNC_MAX_USERS {
-        return Err(Error::BadRequest(format!(
-            "Git sync is available for workspaces with up to {} members. \
-             Upgrade to Windmill Enterprise Edition for unlimited workspace members.",
-            CE_GIT_SYNC_MAX_USERS
-        )));
-    }
+async fn check_git_sync_access(_db: &DB, _w_id: &str) -> Result<()> {
     Ok(())
 }
 
@@ -2520,24 +2502,15 @@ async fn get_git_sync_enabled(
 #[cfg(not(feature = "enterprise"))]
 async fn get_git_sync_enabled(
     _authed: ApiAuthed,
-    Extension(db): Extension<DB>,
-    Path(w_id): Path<String>,
+    Extension(_db): Extension<DB>,
+    Path(_w_id): Path<String>,
 ) -> JsonResult<serde_json::Value> {
-    let user_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM usr WHERE workspace_id = $1 AND disabled = false",
-        &w_id
-    )
-    .fetch_one(&db)
-    .await?
-    .unwrap_or(0);
-
-    let enabled = user_count <= CE_GIT_SYNC_MAX_USERS;
     Ok(Json(serde_json::json!({
-        "enabled": enabled,
-        "reason": if enabled { Some("free_tier") } else { None::<&str> },
-        "max_repos": if enabled { Some(1) } else { None::<i32> },
-        "user_count": user_count,
-        "max_users": CE_GIT_SYNC_MAX_USERS,
+        "enabled": true,
+        "reason": "unlimited",
+        "max_repos": null,
+        "user_count": null,
+        "max_users": null,
     })))
 }
 
