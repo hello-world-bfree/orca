@@ -296,7 +296,7 @@ jobs:
 
       - name: Post Codex review comment
         if: steps.codex_config.outputs.enabled == 'true' && steps.pr.outputs.skip != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         with:
