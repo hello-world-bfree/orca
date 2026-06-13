@@ -1,3 +1,6 @@
 [env]
 WM_IMAGE = "windmill:dev"
 DATABASE_URL = "postgres://postgres:changeme@db/windmill?sslmode=disable"
+
+[tools]
+bun = "latest"
