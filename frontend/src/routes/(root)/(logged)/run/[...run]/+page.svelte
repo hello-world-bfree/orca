@@ -42,7 +42,6 @@
 
 	import DisplayResult from '$lib/components/DisplayResult.svelte'
 	import {
-		enterpriseLicense,
 		initialArgsStore,
 		superadmin,
 		userStore,
@@ -713,8 +712,8 @@
 					}}
 					flowPath={job.script_path}
 					flowVersionId={job.script_hash ? parseInt(job.script_hash, 16) : undefined}
-					disabled={!$enterpriseLicense}
-					enterpriseOnly={!$enterpriseLicense}
+					disabled={false}
+					enterpriseOnly={false}
 				/>
 			{/if}
 			{#if job?.job_kind === 'script' || job?.job_kind === 'script_hub' || job?.job_kind === 'flow'}

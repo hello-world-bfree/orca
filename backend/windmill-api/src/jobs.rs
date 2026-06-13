@@ -4653,25 +4653,12 @@ pub async fn run_flow_by_version_inner(
     Ok((uuid, early_return, has_failure_module))
 }
 
-#[cfg(not(feature = "enterprise"))]
-pub async fn restart_flow(
-    _authed: ApiAuthed,
-    Extension(_db): Extension<DB>,
-    Extension(_user_db): Extension<UserDB>,
-    Path((_w_id, _job_id, _step_id, _branch_or_iteration_n)): Path<(
-        String,
-        Uuid,
-        String,
-        Option<usize>,
-    )>,
-    Query(_run_query): Query<RunJobQuery>,
-) -> error::Result<(StatusCode, String)> {
-    return Err(Error::BadRequest(
-        "Restarting a flow is a feature only available in enterprise version".to_string(),
-    ));
-}
-
-#[cfg(feature = "enterprise")]
+// deviation: flow step restart (incl. nested BranchOne/ForLoop/Subflow) works in OSS.
+// Upstream gates the API entrypoint with `#[cfg(feature = "enterprise")]` + a stub that
+// returns BadRequest; the whole worker/queue side (RestartedFlow payload,
+// restarted_flows_resolution, nested_restart_payload) is already compiled in OSS. Dropped
+// the stub and un-gated the real handler + its helpers so the existing machinery is
+// reachable. License check is a no-op in OSS (see check_license_key_valid). Task 7.
 #[derive(Deserialize)]
 pub struct RestartFlowRequestBody {
     step_id: String,
@@ -4686,7 +4673,6 @@ pub struct RestartFlowRequestBody {
     nested_path: Vec<NestedRestartStep>,
 }
 
-#[cfg(feature = "enterprise")]
 #[derive(Deserialize)]
 pub struct NestedRestartStep {
     step_id: String,
@@ -4708,7 +4694,6 @@ pub struct NestedRestartStep {
 ///   BranchOne, else None
 /// - `nested_chain`: the `RestartedFrom` to embed under the top-level run's
 ///   `restarted_from.nested` (None when `nested_path` is empty)
-#[cfg(feature = "enterprise")]
 async fn resolve_nested_restart(
     db: &DB,
     workspace_id: &str,
@@ -4887,7 +4872,6 @@ async fn resolve_nested_restart(
     Ok((parent_branch_chosen, Some(Box::new(nested_chain))))
 }
 
-#[cfg(feature = "enterprise")]
 pub async fn restart_flow(
     authed: ApiAuthed,
     Extension(db): Extension<DB>,
@@ -9257,16 +9241,31 @@ mod approval_view_gate_tests {
     fn anonymous_cannot_view_when_auth_required() {
         // The regression: an unauthenticated holder of the approval token must see nothing.
         let c = Some(conds(true, vec![]));
-        assert!(!can_view(&None, &c, Some("f/team/flow"), "trigger@example.com"));
+        assert!(!can_view(
+            &None,
+            &c,
+            Some("f/team/flow"),
+            "trigger@example.com"
+        ));
     }
 
     #[test]
     fn anonymous_can_view_when_no_auth_required() {
         // Unchanged behaviour: token alone is sufficient when auth isn't required.
         let c = Some(conds(false, vec![]));
-        assert!(can_view(&None, &c, Some("f/team/flow"), "trigger@example.com"));
+        assert!(can_view(
+            &None,
+            &c,
+            Some("f/team/flow"),
+            "trigger@example.com"
+        ));
         // No approval conditions at all also allows token-only view.
-        assert!(can_view(&None, &None, Some("f/team/flow"), "trigger@example.com"));
+        assert!(can_view(
+            &None,
+            &None,
+            Some("f/team/flow"),
+            "trigger@example.com"
+        ));
     }
 
     #[test]
@@ -9291,7 +9290,17 @@ mod approval_view_gate_tests {
         let member = Some(authed("carol", false, vec!["approvers".to_string()]));
         let outsider = Some(authed("dave", false, vec!["other".to_string()]));
         // Use a non-owned folder path so ownership doesn't short-circuit the check.
-        assert!(can_view(&member, &c, Some("f/team/flow"), "trigger@example.com"));
-        assert!(!can_view(&outsider, &c, Some("f/team/flow"), "trigger@example.com"));
+        assert!(can_view(
+            &member,
+            &c,
+            Some("f/team/flow"),
+            "trigger@example.com"
+        ));
+        assert!(!can_view(
+            &outsider,
+            &c,
+            Some("f/team/flow"),
+            "trigger@example.com"
+        ));
     }
 }

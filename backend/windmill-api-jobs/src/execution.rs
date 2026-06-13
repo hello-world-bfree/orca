@@ -75,6 +75,14 @@ pub async fn check_license_key_valid() -> error::Result<()> {
     Ok(())
 }
 
+// deviation: OSS has no license key, so the license check is a no-op on default-feature
+// builds. Lets us un-gate EE-only API entrypoints (flow step restart, Task 7) without
+// flipping enterprise/private. EE/private builds use the real check above.
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_license_key_valid() -> error::Result<()> {
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Cancel jobs
 // ---------------------------------------------------------------------------
