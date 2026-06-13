@@ -188,7 +188,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'dev_instance',
 			fieldType: 'boolean',
 			storage: 'setting',
-			ee_only: '',
 			hideInQuickSetup: true
 		},
 		{
@@ -198,7 +197,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'app_workspaced_route',
 			fieldType: 'boolean',
 			storage: 'setting',
-			ee_only: '',
 			hideInQuickSetup: true
 		},
 		{
@@ -208,7 +206,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'http_route_workspaced_route',
 			fieldType: 'boolean',
 			storage: 'setting',
-			ee_only: '',
 			hideInQuickSetup: true
 		},
 		{
@@ -218,7 +215,6 @@ export const settings: Record<string, Setting[]> = {
 			fieldType: 'number',
 			placeholder: '365',
 			storage: 'setting',
-			ee_only: '',
 			hideInQuickSetup: true
 		}
 	],
@@ -448,7 +444,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'hub_base_url',
 			fieldType: 'text',
 			storage: 'setting',
-			ee_only: '',
 			advancedToggle: {
 				label: 'I have a different URL for Hub access from end-user browsers',
 				onChange(values) {
@@ -471,7 +466,6 @@ export const settings: Record<string, Setting[]> = {
 			fieldType: 'text',
 			hiddenIfNull: true,
 			storage: 'setting',
-			ee_only: '',
 			requiresReloadOnChange: true
 		},
 		{
@@ -480,8 +474,7 @@ export const settings: Record<string, Setting[]> = {
 				'If access to your Private Hub is restricted, you can set the hub API secret here. <a href="https://www.windmill.dev/docs/core_concepts/private_hub">Learn more</a>',
 			key: 'hub_api_secret',
 			fieldType: 'password',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Azure OpenAI base path',
@@ -490,7 +483,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'openai_azure_base_path',
 			fieldType: 'text',
 			storage: 'setting',
-			ee_only: '',
 			hiddenIfEmpty: true
 		},
 		{
@@ -500,7 +492,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'disable_hub',
 			fieldType: 'boolean',
 			storage: 'setting',
-			ee_only: '',
 			requiresReloadOnChange: true
 		}
 	],
@@ -509,8 +500,7 @@ export const settings: Record<string, Setting[]> = {
 			label: 'SMTP configuration',
 			key: 'smtp_settings',
 			fieldType: 'smtp_connect',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		}
 	],
 	'Auth/OAuth/SAML': [
@@ -770,8 +760,7 @@ export const settings: Record<string, Setting[]> = {
 				'Send critical alerts when API tokens are about to expire (within 7 days) or have expired',
 			key: 'critical_alerts_on_token_expiry',
 			fieldType: 'boolean',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Slack',
@@ -786,8 +775,7 @@ export const settings: Record<string, Setting[]> = {
 			description: 'Alert if DB grows more than specified size',
 			fieldType: 'critical_alerts_on_db_oversize',
 			placeholder: '100',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		}
 	],
 	Webhooks: [
@@ -1049,7 +1037,7 @@ export const instanceSettingsNavigationGroups = [
 				label: 'Private Hub',
 				aiId: 'instance-settings-private-hub',
 				aiDescription: 'Instance private hub settings',
-				isEE: true
+				isEE: false
 			},
 			{
 				id: 'telemetry',
