@@ -780,16 +780,11 @@ pub async fn read_ee_registry<T>(
     w_id: &str,
     conn: &Connection,
 ) -> Option<T> {
-    if !cfg!(feature = "enterprise") && value.is_some() {
-        append_logs(
-            job_id,
-            w_id,
-            format!("Private registry ({name}) configuration ignored: this feature requires Windmill Enterprise Edition\n"),
-            conn,
-        )
-        .await;
-        return None;
-    }
+    // deviation: private / per-workspace registries work in OSS. Upstream gates them here with
+    // `if !cfg!(feature = "enterprise") && value.is_some() { warn; return None }`; removed so a
+    // configured value (global or workspace override) is honored on default-feature builds. This
+    // also un-gates the global PIP_INDEX_URL/npmrc/etc. paths that funnel through this helper.
+    let _ = (name, job_id, w_id, conn);
     value
 }
 
@@ -840,16 +835,9 @@ pub async fn read_ee_registry_bool_with_workspace_override(
             .and_then(|v| v.as_bool())
     };
     let value = ws_value.unwrap_or(global_value);
-    if !cfg!(feature = "enterprise") && value {
-        append_logs(
-            job_id,
-            w_id,
-            format!("Private registry ({display_name}) configuration ignored: this feature requires Windmill Enterprise Edition\n"),
-            conn,
-        )
-        .await;
-        return false;
-    }
+    // deviation: removed the EE gate
+    // (`if !cfg!(feature = "enterprise") && value { warn; return false }`) so OSS honors the setting.
+    let _ = (display_name, job_id, w_id, conn);
     value
 }
 

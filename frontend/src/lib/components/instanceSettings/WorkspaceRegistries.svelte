@@ -134,7 +134,6 @@
 
 <SettingCard
 	label="Workspace-Specific Registry Overrides"
-	ee_only=""
 	description="Override global registry settings for specific workspaces. Workspace overrides fully replace the global value for each configured key."
 >
 	{#if workspaceIds.length === 0 && !showAddWorkspace}
