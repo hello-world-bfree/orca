@@ -6,7 +6,6 @@
 	import { SettingService } from '$lib/gen'
 	import { sendUserToast } from '$lib/toast'
 	import TestConnection from './TestConnection.svelte'
-	import { enterpriseLicense } from '$lib/stores'
 	import { displaySize } from '$lib/utils'
 	import SimpleEditor from './SimpleEditor.svelte'
 	import Label from './Label.svelte'
@@ -251,7 +250,6 @@
 
 <div class="my-0.5">
 	<Toggle
-		disabled={!$enterpriseLicense}
 		options={{ right: bucket_config ? '' : 'set object store' }}
 		checked={Boolean(bucket_config)}
 		on:change={(e) => {
