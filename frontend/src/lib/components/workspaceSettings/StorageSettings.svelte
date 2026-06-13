@@ -113,22 +113,14 @@
 	description="Connect your Windmill workspace to your S3 bucket, Azure Blob storage, or Google Cloud Storage to enable users to read and write from object storage without having to have access to the credentials."
 	link="https://www.windmill.dev/docs/core_concepts/object_storage_in_windmill#workspace-object-storage"
 />
-{#if !$enterpriseLicense}
-	<Alert type="info" title="S3 storage is limited to 20 files in Windmill CE">
-		Windmill S3 bucket browser will not work for buckets containing more than 20 files and uploads
-		are limited to files {'<'} 50MB. Consider upgrading to Windmill EE to use this feature with large
-		buckets.
-	</Alert>
-{:else}
-	<Alert type="info" title="Logs storage is set at the instance level">
-		This setting is only for storage of large files allowing to upload files directly to object
-		storage using S3Object and use the wmill sdk to read and write large files backed by an object
-		storage. Large-scale log management and distributed dependency caching is under <a
-			href="https://www.windmill.dev/docs/core_concepts/object_storage_in_windmill#instance-object-storage"
-			>Instance object storage</a
-		>, set by the superadmins in the instance settings UI.
-	</Alert>
-{/if}
+<Alert type="info" title="Logs storage is set at the instance level">
+	This setting is only for storage of large files allowing to upload files directly to object
+	storage using S3Object and use the wmill sdk to read and write large files backed by an object
+	storage. Large-scale log management and distributed dependency caching is under <a
+		href="https://www.windmill.dev/docs/core_concepts/object_storage_in_windmill#instance-object-storage"
+		>Instance object storage</a
+	>, set by the superadmins in the instance settings UI.
+</Alert>
 {#if s3ResourceSettings}
 	<DataTable containerClass="storage-settings-table mt-4">
 		<Head>
