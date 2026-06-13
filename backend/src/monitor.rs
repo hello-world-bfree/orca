@@ -1851,10 +1851,9 @@ pub async fn reload_maven_settings_xml_setting(conn: &Connection) {
     )
     .await;
 
-    if !cfg!(feature = "enterprise") {
-        return;
-    }
-
+    // deviation: write the global Maven settings.xml in OSS too. Upstream gates this with
+    // `if !cfg!(feature = "enterprise") { return; }`; removed so private Maven repos / auth work
+    // in OSS. Companion to the un-gated private registries (Task 4). In-tree fs writes, no EE tech.
     let settings_xml = MAVEN_SETTINGS_XML.read().await.clone();
     match settings_xml {
         Some(ref content) if !content.trim().is_empty() => {

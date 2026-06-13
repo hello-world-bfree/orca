@@ -415,7 +415,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'object_store_cache_config',
 			fieldType: 'object_store_config',
 			storage: 'setting',
-			ee_only: '',
 			isValid: (v) => {
 				if (!v || v.type !== 'Gcs') return true
 				return v.serviceAccountKey !== undefined
@@ -427,8 +426,7 @@ export const settings: Record<string, Setting[]> = {
 				'Job and service logs are periodically deleted from disk when they expire. When this setting is on, they are also deleted from object storage. Defaults to on when object storage is configured; turn off to keep logs in object storage indefinitely.',
 			key: 'monitor_logs_on_s3',
 			fieldType: 'boolean',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Store audit logs in object storage',
@@ -573,8 +571,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'pip_index_url',
 			fieldType: 'password',
 			placeholder: 'https://username:password@pypi.company.com/simple',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'UV extra index url',
@@ -582,8 +579,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'pip_extra_index_url',
 			fieldType: 'password',
 			placeholder: 'https://username:password@pypi.company.com/simple',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'UV Python install mirror',
@@ -617,8 +613,7 @@ export const settings: Record<string, Setting[]> = {
 					tooltip: 'Search for packages across all indexes, preferring the best match'
 				}
 			],
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'NPM Registry Configuration (.npmrc)',
@@ -629,8 +624,7 @@ export const settings: Record<string, Setting[]> = {
 			codeAreaLang: 'ini',
 			placeholder:
 				'registry=https://registry.mycompany.com/\n//registry.mycompany.com/:_authToken=YOUR_TOKEN\n\n@myorg:registry=https://registry.myorg.com/\n//registry.myorg.com/:_authToken=SCOPED_TOKEN',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Npm config registry (legacy)',
@@ -639,7 +633,6 @@ export const settings: Record<string, Setting[]> = {
 			fieldType: 'password',
 			placeholder: 'https://registry.npmjs.org/:_authToken=npm_FOOBAR',
 			storage: 'setting',
-			ee_only: '',
 			hiddenIfEmpty: true
 		},
 		{
@@ -650,7 +643,6 @@ export const settings: Record<string, Setting[]> = {
 			fieldType: 'password',
 			placeholder: '"@myorg3" = { token = "mytoken", url = "https://registry.myorg.com/" }',
 			storage: 'setting',
-			ee_only: '',
 			hiddenIfEmpty: true
 		},
 		{
@@ -678,8 +670,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'nuget_config',
 			fieldType: 'codearea',
 			codeAreaLang: 'xml',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Maven/Ivy repositories',
@@ -687,8 +678,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'maven_repos',
 			fieldType: 'password',
 			placeholder: 'https://user:password@artifacts.foo.com/maven',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Maven settings.xml',
@@ -697,16 +687,14 @@ export const settings: Record<string, Setting[]> = {
 			key: 'maven_settings_xml',
 			fieldType: 'codearea',
 			codeAreaLang: 'xml',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Disable default Maven repository',
 			description: 'Do not use default Maven repository',
 			key: 'no_default_maven',
 			fieldType: 'boolean',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Ruby Gems repositories',
@@ -714,8 +702,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'ruby_repos',
 			fieldType: 'password',
 			placeholder: 'https://user:password@gems.foo.com/',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'Cargo registries',
@@ -723,8 +710,7 @@ export const settings: Record<string, Setting[]> = {
 			key: 'cargo_registries',
 			fieldType: 'codearea',
 			codeAreaLang: 'toml',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'PowerShell Repository URL',
@@ -733,8 +719,7 @@ export const settings: Record<string, Setting[]> = {
 			placeholder:
 				'https://pkgs.dev.azure.com/<org>/<project>/_packaging/<feed>/nuget/v3/index.json',
 			fieldType: 'text',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		},
 		{
 			label: 'PowerShell Repository PAT',
@@ -742,8 +727,7 @@ export const settings: Record<string, Setting[]> = {
 				'Add private PowerShell repository Personal Access Token (optional, for authenticated repositories)',
 			key: 'powershell_repo_pat',
 			fieldType: 'password',
-			storage: 'setting',
-			ee_only: ''
+			storage: 'setting'
 		}
 	],
 	Alerts: [

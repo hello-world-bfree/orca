@@ -102,11 +102,9 @@ async fn list_search_flows(
     Path(w_id): Path<String>,
     Extension(user_db): Extension<UserDB>,
 ) -> JsonResult<Vec<SearchFlow>> {
-    #[cfg(feature = "enterprise")]
+    // deviation: OSS flow-search limit raised 3 -> 1000 to match upstream EE (was a cfg-split).
+    // Pure result cap, no EE-exclusive tech; the 3-result CE limit is a self-host annoyance.
     let n = 1000;
-
-    #[cfg(not(feature = "enterprise"))]
-    let n = 3;
     let mut tx = user_db.begin(&authed).await?;
 
     let allowed = build_scope_path_predicate(&authed, "flows", "read");
