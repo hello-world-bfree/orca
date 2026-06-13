@@ -6,14 +6,14 @@
 	import AuditLogsFilters from '$lib/components/auditLogs/AuditLogsFilters.svelte'
 	import AuditLogsTable from '$lib/components/auditLogs/AuditLogsTable.svelte'
 	import AuditLogMobileFilters from '$lib/components/auditLogs/AuditLogMobileFilters.svelte'
-	import { Alert, DrawerContent, Skeleton } from '$lib/components/common'
+	import { DrawerContent, Skeleton } from '$lib/components/common'
 
 	import Drawer from '$lib/components/common/drawer/Drawer.svelte'
 	import SplitPanesWrapper from '$lib/components/splitPanes/SplitPanesWrapper.svelte'
 
 	import type { AuditLog } from '$lib/gen'
 	import { AuditService } from '$lib/gen'
-	import { enterpriseLicense, userStore, workspaceStore, userWorkspaces } from '$lib/stores'
+	import { userStore, workspaceStore, userWorkspaces } from '$lib/stores'
 	import { Splitpanes, Pane } from 'svelte-splitpanes'
 	import AuditLogsTimeline from '$lib/components/auditLogs/AuditLogsTimeline.svelte'
 
@@ -150,14 +150,6 @@
 			{/if}
 		</div>
 		<div class="flex-grow w-full min-h-0">
-			<div class="px-2">
-				{#if !$enterpriseLicense || $enterpriseLicense.endsWith('_pro')}
-					<Alert title="Redacted audit logs" type="warning">
-						You need an enterprise license to see unredacted audit logs.
-					</Alert>
-					<div class="py-2"></div>
-				{/if}
-			</div>
 			<SplitPanesWrapper>
 				<Splitpanes>
 					<Pane size={70} minSize={50}>
