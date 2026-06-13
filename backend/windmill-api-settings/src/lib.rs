@@ -45,6 +45,10 @@ use serde::{Deserialize, Serialize};
 use windmill_ai::ai_cache::bump_instance_ai_config_revision;
 #[cfg(feature = "enterprise")]
 use windmill_common::ee_oss::{send_critical_alert, CriticalAlertKind, CriticalErrorChannel};
+// deviation: OSS critical-alert delivery — pull the same items into the pure-OSS build so the
+// `test_critical_channels` endpoint can actually deliver instead of returning a stub string.
+#[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+use windmill_common::ee_oss::{send_critical_alert, CriticalAlertKind, CriticalErrorChannel};
 #[cfg(all(feature = "private", feature = "enterprise"))]
 use windmill_common::secret_backend::{
     AwsSecretsManagerSettings, AzureKeyVaultSettings, SecretMigrationReport, VaultSettings,
@@ -1082,9 +1086,28 @@ pub async fn test_critical_channels(
     Ok("Sent test critical error".to_string())
 }
 
-#[cfg(not(feature = "enterprise"))]
+#[cfg(all(not(feature = "enterprise"), feature = "private"))]
 pub async fn test_critical_channels() -> Result<String> {
     Ok("Critical channels require EE".to_string())
+}
+
+// deviation: pure-OSS build delivers test alerts through our OSS `send_critical_alert`.
+#[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+pub async fn test_critical_channels(
+    Extension(db): Extension<DB>,
+    authed: ApiAuthed,
+    Json(test_critical_channels): Json<Vec<CriticalErrorChannel>>,
+) -> Result<String> {
+    require_super_admin(&db, &authed.email).await?;
+
+    send_critical_alert(
+        "Test critical error".to_string(),
+        &db,
+        CriticalAlertKind::CriticalError,
+        Some(test_critical_channels),
+    )
+    .await;
+    Ok("Sent test critical error".to_string())
 }
 
 #[cfg(feature = "enterprise")]

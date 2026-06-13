@@ -150,7 +150,7 @@
 	<!-- Slack Card -->
 	<SlackChannelCard
 		channels={slackChannels}
-		disabled={!$enterpriseLicense}
+		disabled={false}
 		onAddChannel={addSlackChannel}
 		onRemoveChannel={removeChannel}
 		onUpdateChannel={updateChannel}
@@ -177,7 +177,7 @@
 	<EmailChannelCard
 		channels={emailChannels}
 		hasSmtpConfig={isSmtpSettingsValid($values['smtp_settings'])}
-		disabled={!$enterpriseLicense}
+		disabled={false}
 		onAddChannel={addEmailChannel}
 		onRemoveChannel={removeChannel}
 		onUpdateChannel={updateChannel}

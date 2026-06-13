@@ -754,7 +754,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'critical_error_channels',
 			fieldType: 'critical_error_channels',
 			storage: 'setting',
-			ee_only: 'Channels other than tracing are only available in the EE version',
 			actionButton: {
 				label: 'Test all channels',
 				onclick: async (values) => {
@@ -998,7 +997,7 @@ export const instanceSettingsNavigationGroups = [
 				label: 'Object Storage',
 				aiId: 'instance-settings-object-storage',
 				aiDescription: 'Instance object storage settings',
-				isEE: true
+				isEE: false
 			}
 		]
 	},
@@ -1010,7 +1009,7 @@ export const instanceSettingsNavigationGroups = [
 				label: 'Alerts',
 				aiId: 'instance-settings-alerts',
 				aiDescription: 'Instance alerts settings',
-				isEE: true
+				isEE: false
 			},
 			{
 				id: 'webhooks',
