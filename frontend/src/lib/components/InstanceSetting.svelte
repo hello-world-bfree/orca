@@ -785,11 +785,17 @@
 				{:else if setting.fieldType == 'password'}
 					<Password small placeholder={setting.placeholder} bind:password={$values[setting.key]} />
 				{:else if setting.fieldType == 'boolean'}
-					<Toggle
-						disabled={setting.ee_only != undefined && !$enterpriseLicense}
-						bind:checked={$values[setting.key]}
-						id={setting.key}
-					/>
+					{#if setting.key === 'disable_stats'}
+						<!-- deviation: telemetry is a no-op in OSS (stats_oss.rs); freeze the toggle
+						     in the telemetry-disabled state (disable_stats=true) and non-interactive. -->
+						<Toggle disabled checked={true} id={setting.key} />
+					{:else}
+						<Toggle
+							disabled={setting.ee_only != undefined && !$enterpriseLicense}
+							bind:checked={$values[setting.key]}
+							id={setting.key}
+						/>
+					{/if}
 				{:else if setting.fieldType == 'seconds'}
 					<div>
 						<SecondsInput
