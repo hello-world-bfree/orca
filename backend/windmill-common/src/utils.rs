@@ -10,6 +10,8 @@ use crate::auth::is_devops_email;
 use crate::ee_oss::LICENSE_KEY_ID;
 #[cfg(feature = "enterprise")]
 use crate::ee_oss::{send_critical_alert, CriticalAlertKind};
+#[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+use crate::ee_oss::{send_critical_alert, CriticalAlertKind};
 use crate::error::{to_anyhow, Error, Result};
 use crate::global_settings::UNIQUE_ID_SETTING;
 use crate::DB;
@@ -561,6 +563,13 @@ pub async fn report_critical_error(
     } else {
         send_critical_alert(error_message, &_db, CriticalAlertKind::CriticalError, None).await;
     }
+
+    #[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+    if *CLOUD_HOSTED && workspace_id.is_some() {
+        tracing::error!(error_message)
+    } else {
+        send_critical_alert(error_message, &_db, CriticalAlertKind::CriticalError, None).await;
+    }
 }
 
 pub async fn report_recovered_critical_error(
@@ -600,6 +609,19 @@ pub async fn report_recovered_critical_error(
     }
 
     #[cfg(feature = "enterprise")]
+    if *CLOUD_HOSTED && workspace_id.is_some() {
+        tracing::error!(message);
+    } else {
+        send_critical_alert(
+            message,
+            &_db,
+            CriticalAlertKind::RecoveredCriticalError,
+            None,
+        )
+        .await;
+    }
+
+    #[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
     if *CLOUD_HOSTED && workspace_id.is_some() {
         tracing::error!(message);
     } else {

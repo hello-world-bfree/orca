@@ -108,9 +108,7 @@ pub struct TeamsChannel {
 
 #[cfg(not(feature = "private"))]
 pub enum CriticalAlertKind {
-    #[cfg(feature = "enterprise")]
     CriticalError,
-    #[cfg(feature = "enterprise")]
     RecoveredCriticalError,
 }
 
@@ -121,6 +119,105 @@ pub async fn send_critical_alert(
     _kind: CriticalAlertKind,
     _channels: Option<Vec<CriticalErrorChannel>>,
 ) {
+}
+
+// deviation: OSS critical-alert delivery (Email + Slack). Upstream gates delivery behind
+// `enterprise`; we provide an OSS implementation that iterates the configured channels.
+#[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+pub async fn send_critical_alert(
+    error_message: String,
+    db: &crate::db::DB,
+    kind: CriticalAlertKind,
+    channels: Option<Vec<CriticalErrorChannel>>,
+) {
+    let subject = match kind {
+        CriticalAlertKind::CriticalError => "Critical error on Windmill instance",
+        CriticalAlertKind::RecoveredCriticalError => {
+            "Recovered from critical error on Windmill instance"
+        }
+    };
+
+    let global = crate::CRITICAL_ERROR_CHANNELS.load_full();
+    let channels: &[CriticalErrorChannel] = match channels.as_deref() {
+        Some(channels) => channels,
+        None => &global,
+    };
+
+    for channel in channels {
+        match channel {
+            CriticalErrorChannel::Email { email } => {
+                let smtp_cfg = crate::worker::SMTP_CONFIG.load_full();
+                if let Some(smtp) = smtp_cfg.as_ref().as_ref() {
+                    if let Err(e) = crate::email_oss::send_email_plain_text(
+                        subject,
+                        &error_message,
+                        vec![email.clone()],
+                        smtp.clone(),
+                        None,
+                    )
+                    .await
+                    {
+                        tracing::error!("Failed to send critical alert email to {email}: {e}");
+                    }
+                } else {
+                    tracing::warn!(
+                        "SMTP not configured; cannot send critical alert email to {email}"
+                    );
+                }
+            }
+            CriticalErrorChannel::Slack { slack_channel } => {
+                if let Err(e) =
+                    send_critical_alert_slack(db, slack_channel, subject, &error_message).await
+                {
+                    tracing::error!(
+                        "Failed to send critical alert to Slack channel {slack_channel}: {e}"
+                    );
+                }
+            }
+            CriticalErrorChannel::Teams { .. } => {
+                tracing::warn!(
+                    "Microsoft Teams critical alerts are not supported in this OSS build"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+async fn send_critical_alert_slack(
+    db: &crate::db::DB,
+    channel: &str,
+    subject: &str,
+    message: &str,
+) -> crate::error::Result<()> {
+    let token = crate::variables::get_secret_value_as_admin(
+        db,
+        "admins",
+        crate::oauth2::GLOBAL_SLACK_BOT_TOKEN_PATH,
+    )
+    .await?;
+
+    let resp = reqwest::Client::new()
+        .post("https://slack.com/api/chat.postMessage")
+        .bearer_auth(token)
+        .json(&serde_json::json!({
+            "channel": channel,
+            "text": format!("*{subject}*\n{message}"),
+        }))
+        .send()
+        .await
+        .map_err(|e| crate::error::Error::internal_err(format!("Slack request failed: {e}")))?;
+
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.map_err(|e| {
+        crate::error::Error::internal_err(format!("Slack response parse failed: {e}"))
+    })?;
+    if !body.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return Err(crate::error::Error::internal_err(format!(
+            "Slack API error (status {status}): {body}"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(all(feature = "enterprise", not(feature = "private")))]
