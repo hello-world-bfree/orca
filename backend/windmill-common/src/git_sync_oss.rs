@@ -10,10 +10,12 @@ use crate::{
     auth::JWTAuthClaims,
     error::{to_anyhow, Error},
     global_settings::{load_value_from_global_settings, GITHUB_ENTERPRISE_APP_SETTING},
-    jwt::decode_with_internal_secret,
+    jwt::{decode_with_internal_secret, encode_with_internal_secret},
 };
 #[cfg(not(feature = "private"))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "private"))]
+use std::collections::HashMap;
 
 // OSS deviation: our own AGPL implementation of the GitHub App git-sync auth that upstream
 // ships only under `private` (`git_sync_ee.rs`). Standard GitHub App flow: sign an RS256
@@ -72,6 +74,21 @@ pub struct GhesConfigPublic {
     pub client_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app_owner: Option<String>,
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+pub struct GhesAssignedWorkspace {
+    pub workspace_id: String,
+    pub provisioned_by_admin: bool,
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+pub struct GhesDiscoveredInstallation {
+    pub installation_id: i64,
+    pub account_id: String,
+    pub assigned_workspaces: Vec<GhesAssignedWorkspace>,
 }
 
 #[cfg(not(feature = "private"))]
@@ -553,10 +570,11 @@ async fn fetch_installation_account(
 // Registers a freshly-created installation on a workspace: resolves its GitHub account via the API,
 // stores the configured GHES base URL on the row (so token minting later targets the right host).
 #[cfg(not(feature = "private"))]
-pub async fn register_installation(
+async fn register_installation_with(
     db: &Pool<Postgres>,
     w_id: &str,
     installation_id: i64,
+    provisioned_by_admin: bool,
 ) -> crate::error::Result<()> {
     let config = load_github_app_config(db).await?;
     let github_base_url = config.base_url.clone().filter(|b| {
@@ -571,6 +589,167 @@ pub async fn register_installation(
         installation_id,
         account_id,
         github_base_url,
+        provisioned_by_admin,
+    )
+    .await
+}
+
+// Workspace-initiated install (from the GitHub redirect callback): not admin-provisioned.
+#[cfg(not(feature = "private"))]
+pub async fn register_installation(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+) -> crate::error::Result<()> {
+    register_installation_with(db, w_id, installation_id, false).await
+}
+
+// Super-admin assignment of a discovered installation to a workspace: marked admin-provisioned so
+// workspace admins cannot remove it.
+#[cfg(not(feature = "private"))]
+pub async fn assign_installation(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+) -> crate::error::Result<()> {
+    register_installation_with(db, w_id, installation_id, true).await
+}
+
+#[cfg(not(feature = "private"))]
+async fn list_app_installations(
+    config: &GithubAppConfig,
+) -> crate::error::Result<Vec<(i64, String)>> {
+    let app_jwt = create_app_jwt(config)?;
+    let api_base = github_api_base(config.base_url.as_deref());
+
+    let resp = reqwest::Client::new()
+        .get(format!("{api_base}/app/installations?per_page=100"))
+        .header("Authorization", format!("Bearer {app_jwt}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "windmill")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(to_anyhow)?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(Error::internal_err(format!(
+            "GitHub list-app-installations failed ({status}): {body}"
+        )));
+    }
+
+    #[derive(Deserialize)]
+    struct Account {
+        login: String,
+    }
+    #[derive(Deserialize)]
+    struct Installation {
+        id: i64,
+        account: Account,
+    }
+    let parsed: Vec<Installation> = resp.json().await.map_err(to_anyhow)?;
+    Ok(parsed
+        .into_iter()
+        .map(|i| (i.id, i.account.login))
+        .collect())
+}
+
+// Lists every installation the configured app can see, annotated with the workspaces each is
+// assigned to in this instance. Super-admin only (instance-wide view).
+#[cfg(not(feature = "private"))]
+pub async fn discover_ghes_installations(
+    db: &Pool<Postgres>,
+) -> crate::error::Result<Vec<GhesDiscoveredInstallation>> {
+    let config = load_github_app_config(db).await?;
+    let app_installations = list_app_installations(&config).await?;
+
+    let rows = sqlx::query(
+        "SELECT workspace_id, git_app_installations FROM workspace_settings \
+         WHERE git_app_installations IS NOT NULL AND git_app_installations <> '[]'::jsonb",
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut assigned: HashMap<i64, Vec<GhesAssignedWorkspace>> = HashMap::new();
+    for row in rows {
+        let workspace_id: String = row.try_get("workspace_id").unwrap_or_default();
+        let value: serde_json::Value = row
+            .try_get("git_app_installations")
+            .unwrap_or_else(|_| serde_json::Value::Array(vec![]));
+        let installations: Vec<InstallationRow> = serde_json::from_value(value).unwrap_or_default();
+        for inst in installations {
+            assigned
+                .entry(inst.installation_id)
+                .or_default()
+                .push(GhesAssignedWorkspace {
+                    workspace_id: workspace_id.clone(),
+                    provisioned_by_admin: inst.provisioned_by_admin.unwrap_or(false),
+                });
+        }
+    }
+
+    Ok(app_installations
+        .into_iter()
+        .map(|(installation_id, account_id)| GhesDiscoveredInstallation {
+            installation_id,
+            account_id,
+            assigned_workspaces: assigned.remove(&installation_id).unwrap_or_default(),
+        })
+        .collect())
+}
+
+// Export/import move an installation reference between workspaces (or instances sharing the same
+// internal JWT secret AND GitHub App config). The JWT is a tamper-evident envelope, not the token.
+#[cfg(not(feature = "private"))]
+#[derive(Serialize, Deserialize)]
+struct InstallationExportClaims {
+    installation_id: i64,
+    account_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    github_base_url: Option<String>,
+    exp: usize,
+}
+
+#[cfg(not(feature = "private"))]
+pub async fn export_installation(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+) -> crate::error::Result<String> {
+    let installations = workspace_installations(db, w_id).await?;
+    let row = installations
+        .into_iter()
+        .find(|i| i.installation_id == installation_id)
+        .ok_or_else(|| {
+            Error::NotFound(format!(
+                "installation {installation_id} not found in workspace {w_id}"
+            ))
+        })?;
+    let exp = (chrono::Utc::now().timestamp() + 315_360_000).max(0) as usize;
+    let claims = InstallationExportClaims {
+        installation_id: row.installation_id,
+        account_id: row.account_id,
+        github_base_url: row.github_base_url,
+        exp,
+    };
+    encode_with_internal_secret(claims).await
+}
+
+#[cfg(not(feature = "private"))]
+pub async fn import_installation(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    jwt_token: &str,
+) -> crate::error::Result<()> {
+    let claims: InstallationExportClaims = decode_with_internal_secret(jwt_token).await?;
+    add_installation_to_workspace(
+        db,
+        w_id,
+        claims.installation_id,
+        claims.account_id,
+        claims.github_base_url,
         false,
     )
     .await

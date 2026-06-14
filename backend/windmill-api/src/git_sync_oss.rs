@@ -15,9 +15,11 @@ use serde::{Deserialize, Serialize};
 use windmill_common::{
     error::{Error, JsonResult, Result},
     git_sync_oss::{
-        copy_installation_to_workspace, get_ghes_config, get_github_app_token_internal,
+        assign_installation, copy_installation_to_workspace, discover_ghes_installations,
+        export_installation, get_ghes_config, get_github_app_token_internal, import_installation,
         list_all_connected_installations, register_installation,
-        remove_installation_from_workspace, GhesConfigPublic, GithubInstallationInfo,
+        remove_installation_from_workspace, GhesConfigPublic, GhesDiscoveredInstallation,
+        GithubInstallationInfo,
     },
     utils::require_admin,
 };
@@ -44,6 +46,11 @@ pub fn workspaced_service() -> Router {
             "/ghes_installation_callback",
             post(ghes_installation_callback),
         )
+        .route(
+            "/export/{installation_id}",
+            get(export_installation_handler),
+        )
+        .route("/import", post(import_installation_handler))
 }
 
 #[cfg(not(feature = "private"))]
@@ -122,10 +129,89 @@ async fn ghes_installation_callback(
 }
 
 #[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+struct ExportResponse {
+    jwt_token: String,
+}
+
+#[cfg(not(feature = "private"))]
+async fn export_installation_handler(
+    authed: ApiAuthed,
+    Extension(db): Extension<DB>,
+    Path((w_id, installation_id)): Path<(String, i64)>,
+) -> JsonResult<ExportResponse> {
+    require_admin(authed.is_admin, &authed.username)?;
+    let jwt_token = export_installation(&db, &w_id, installation_id).await?;
+    Ok(Json(ExportResponse { jwt_token }))
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Deserialize)]
+struct ImportRequest {
+    jwt_token: String,
+}
+
+#[cfg(not(feature = "private"))]
+async fn import_installation_handler(
+    authed: ApiAuthed,
+    Extension(db): Extension<DB>,
+    Path(w_id): Path<String>,
+    Json(req): Json<ImportRequest>,
+) -> Result<String> {
+    require_admin(authed.is_admin, &authed.username)?;
+    import_installation(&db, &w_id, &req.jwt_token).await?;
+    Ok("installation imported".to_string())
+}
+
+#[cfg(not(feature = "private"))]
 pub fn global_service() -> Router {
     Router::new()
         .route("/connected_repositories", get(get_connected_repositories))
         .route("/ghes_config", get(get_ghes_config_handler))
+        .route("/ghes/discover", get(discover_ghes))
+        .route("/ghes/assign", post(assign_ghes))
+        .route(
+            "/ghes/assign/{workspace_id}/{installation_id}",
+            delete(unassign_ghes),
+        )
+}
+
+#[cfg(not(feature = "private"))]
+async fn discover_ghes(
+    ApiAuthed { email, .. }: ApiAuthed,
+    Extension(db): Extension<DB>,
+) -> JsonResult<Vec<GhesDiscoveredInstallation>> {
+    require_super_admin(&db, &email).await?;
+    Ok(Json(discover_ghes_installations(&db).await?))
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Deserialize)]
+struct AssignRequest {
+    workspace_id: String,
+    installation_id: i64,
+}
+
+#[cfg(not(feature = "private"))]
+async fn assign_ghes(
+    ApiAuthed { email, .. }: ApiAuthed,
+    Extension(db): Extension<DB>,
+    Json(req): Json<AssignRequest>,
+) -> Result<String> {
+    require_super_admin(&db, &email).await?;
+    assign_installation(&db, &req.workspace_id, req.installation_id).await?;
+    Ok("installation assigned".to_string())
+}
+
+#[cfg(not(feature = "private"))]
+async fn unassign_ghes(
+    ApiAuthed { email, .. }: ApiAuthed,
+    Extension(db): Extension<DB>,
+    Path((workspace_id, installation_id)): Path<(String, i64)>,
+) -> Result<String> {
+    require_super_admin(&db, &email).await?;
+    remove_installation_from_workspace(&db, &workspace_id, installation_id, true).await?;
+    Ok("installation unassigned".to_string())
 }
 
 #[cfg(not(feature = "private"))]
