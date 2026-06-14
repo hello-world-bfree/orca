@@ -1215,6 +1215,32 @@ pub async fn handle_ansible_job(
                 }
             }
 
+            // OSS deviation: GitHub App git-sync auth. Mirrors the enterprise block above but
+            // resolves the installation by repository URL owner (deterministic with multiple
+            // installs). Absent `is_github_app` field is treated as a plain PAT/SSH resource.
+            #[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+            let is_github_app = git_repo_resource
+                .get("is_github_app")
+                .and_then(|s| s.as_bool())
+                .unwrap_or(false);
+
+            #[cfg(all(not(feature = "enterprise"), not(feature = "private")))]
+            if is_github_app {
+                if let Connection::Sql(db) = conn {
+                    let token = windmill_common::git_sync_oss::get_github_app_installation_token(
+                        db,
+                        &job.workspace_id,
+                        &secret_url,
+                    )
+                    .await?;
+                    secret_url = prepend_token_to_github_url(&secret_url, &token)?;
+                } else {
+                    return Err(windmill_common::error::Error::BadRequest(
+                        "GitHub App authentication is unavailable for agent workers".to_string(),
+                    ));
+                }
+            }
+
             let branch = Some(git_repo_resource.get("branch").and_then(|s| s.as_str()).map(|s| s.to_string())
                 .ok_or(anyhow!("Failed to get branch from git repo resource, please check that the resource has the correct type (git_repository)"))?).filter(|s| !s.is_empty());
 
