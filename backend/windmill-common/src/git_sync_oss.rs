@@ -34,6 +34,44 @@ struct InstallationRow {
     account_id: String,
     #[serde(default)]
     github_base_url: Option<String>,
+    #[serde(default)]
+    provisioned_by_admin: Option<bool>,
+}
+
+// Mirrors the OpenAPI `GithubInstallations` item + GHES config response (see openapi.yaml).
+#[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+pub struct GithubRepository {
+    pub name: String,
+    pub url: String,
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+pub struct GithubInstallationInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    pub installation_id: i64,
+    pub account_id: String,
+    pub repositories: Vec<GithubRepository>,
+    pub total_count: i64,
+    pub per_page: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github_base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provisioned_by_admin: Option<bool>,
+}
+
+#[cfg(not(feature = "private"))]
+#[derive(Serialize)]
+pub struct GhesConfigPublic {
+    pub base_url: String,
+    pub app_slug: String,
+    pub client_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_owner: Option<String>,
 }
 
 #[cfg(not(feature = "private"))]
@@ -245,6 +283,130 @@ pub async fn get_github_app_token_internal(
              token alone (resolution by repository URL is used at clone time)."
                 .to_string(),
         )),
+    }
+}
+
+#[cfg(not(feature = "private"))]
+async fn list_installation_repos(
+    config: &GithubAppConfig,
+    installation_id: i64,
+    base_url_override: Option<&str>,
+) -> crate::error::Result<(Vec<GithubRepository>, i64)> {
+    let token = mint_installation_token(config, installation_id, base_url_override).await?;
+    let api_base = github_api_base(base_url_override.or(config.base_url.as_deref()));
+
+    let resp = reqwest::Client::new()
+        .get(format!("{api_base}/installation/repositories?per_page=100"))
+        .header("Authorization", format!("token {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "windmill")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(to_anyhow)?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(Error::internal_err(format!(
+            "GitHub list-repositories failed ({status}): {body}"
+        )));
+    }
+
+    #[derive(Deserialize)]
+    struct Repo {
+        full_name: String,
+        clone_url: String,
+    }
+    #[derive(Deserialize)]
+    struct ReposResponse {
+        total_count: i64,
+        repositories: Vec<Repo>,
+    }
+    let parsed: ReposResponse = resp.json().await.map_err(to_anyhow)?;
+    let repositories = parsed
+        .repositories
+        .into_iter()
+        .map(|r| GithubRepository { name: r.full_name, url: r.clone_url })
+        .collect();
+    Ok((repositories, parsed.total_count))
+}
+
+// Enumerates every workspace's stored installations and resolves each one's repositories via the
+// GitHub API (best-effort: a per-installation failure is captured in `error`, not propagated).
+#[cfg(not(feature = "private"))]
+pub async fn list_all_connected_installations(
+    db: &Pool<Postgres>,
+) -> crate::error::Result<Vec<GithubInstallationInfo>> {
+    let config = load_github_app_config(db).await?;
+
+    let rows = sqlx::query(
+        "SELECT workspace_id, git_app_installations FROM workspace_settings \
+         WHERE git_app_installations IS NOT NULL AND git_app_installations <> '[]'::jsonb",
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        let workspace_id: String = row.try_get("workspace_id").unwrap_or_default();
+        let value: serde_json::Value = row
+            .try_get("git_app_installations")
+            .unwrap_or_else(|_| serde_json::Value::Array(vec![]));
+        let installations: Vec<InstallationRow> = serde_json::from_value(value).unwrap_or_default();
+
+        for inst in installations {
+            let (repositories, total_count, error) = match list_installation_repos(
+                &config,
+                inst.installation_id,
+                inst.github_base_url.as_deref(),
+            )
+            .await
+            {
+                Ok((repos, total)) => (repos, total, None),
+                Err(e) => (Vec::new(), 0, Some(e.to_string())),
+            };
+            out.push(GithubInstallationInfo {
+                workspace_id: Some(workspace_id.clone()),
+                installation_id: inst.installation_id,
+                account_id: inst.account_id,
+                repositories,
+                total_count,
+                per_page: 100,
+                error,
+                github_base_url: inst.github_base_url,
+                provisioned_by_admin: inst.provisioned_by_admin,
+            });
+        }
+    }
+    Ok(out)
+}
+
+// Returns the public GitHub App config used to build the installation URL. None when the instance
+// has no self-managed app configured (the frontend then treats it as the github.com cloud flow).
+#[cfg(not(feature = "private"))]
+pub async fn get_ghes_config(
+    db: &Pool<Postgres>,
+) -> crate::error::Result<Option<GhesConfigPublic>> {
+    let value = match load_value_from_global_settings(db, GITHUB_ENTERPRISE_APP_SETTING).await? {
+        Some(v) => v,
+        None => return Ok(None),
+    };
+    let field = |key: &str| {
+        value
+            .get(key)
+            .and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+    };
+    match (field("base_url"), field("app_slug"), field("client_id")) {
+        (Some(base_url), Some(app_slug), Some(client_id)) => Ok(Some(GhesConfigPublic {
+            base_url,
+            app_slug,
+            client_id,
+            app_owner: field("app_owner"),
+        })),
+        _ => Ok(None),
     }
 }
 

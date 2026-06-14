@@ -112,7 +112,9 @@ pub mod apps_ee;
 mod apps_oss;
 #[cfg(all(feature = "enterprise", feature = "private"))]
 pub mod git_sync_ee;
-#[cfg(feature = "enterprise")]
+// OSS deviation: compile git_sync_oss in pure-OSS builds too (upstream gates it on `enterprise`)
+// so our GitHub App routes are mounted. See __docs/deviations-roadmap.md Task 7.
+#[cfg(any(feature = "enterprise", not(feature = "private")))]
 mod git_sync_oss;
 #[cfg(all(feature = "parquet", feature = "private"))]
 pub mod job_helpers_ee;
@@ -812,21 +814,21 @@ pub async fn run_server(
                     get(teams_approvals_oss::request_teams_approval),
                 )
                 .nest("/w/{workspace_id}/github_app", {
-                    #[cfg(feature = "enterprise")]
+                    #[cfg(any(feature = "enterprise", not(feature = "private")))]
                     {
                         git_sync_oss::workspaced_service()
                     }
 
-                    #[cfg(not(feature = "enterprise"))]
+                    #[cfg(all(not(feature = "enterprise"), feature = "private"))]
                     Router::new()
                 })
                 .nest("/github_app", {
-                    #[cfg(feature = "enterprise")]
+                    #[cfg(any(feature = "enterprise", not(feature = "private")))]
                     {
                         git_sync_oss::global_service()
                     }
 
-                    #[cfg(not(feature = "enterprise"))]
+                    #[cfg(all(not(feature = "enterprise"), feature = "private"))]
                     Router::new()
                 })
                 .nest(
