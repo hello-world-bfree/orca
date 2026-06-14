@@ -857,7 +857,6 @@ export const settings: Record<string, Setting[]> = {
 			key: 'github_enterprise_app',
 			fieldType: 'github_enterprise_app',
 			storage: 'setting',
-			ee_only: '',
 			error:
 				'When self-managed mode is enabled, Base URL, App ID, App Slug, Client ID, and Private Key are required.',
 			isValid: (v: any) => {
@@ -1029,7 +1028,7 @@ export const instanceSettingsNavigationGroups = [
 				label: 'GitHub App',
 				aiId: 'instance-settings-github-enterprise-app',
 				aiDescription: 'Self-managed GitHub App for git sync',
-				isEE: true
+				isEE: false
 			},
 			{
 				id: 'private_hub',

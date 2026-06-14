@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { workspaceStore, enterpriseLicense, userStore } from '$lib/stores'
+	import { workspaceStore, userStore } from '$lib/stores'
 	import Popover from './meltComponents/Popover.svelte'
 	import Button from './common/button/Button.svelte'
 	import { Loader2, Github, RotateCw, Plus, Minus, Download, AlertTriangle } from 'lucide-svelte'
@@ -63,7 +63,7 @@
 
 	// Load GitHub installations when conditions are met
 	$effect(() => {
-		if (showGitHubApp && $enterpriseLicense && $workspaceStore) {
+		if (showGitHubApp && $workspaceStore) {
 			loadGithubInstallations(githubState, $workspaceStore).catch((error) => {
 				console.error('Failed to load GitHub installations:', error)
 			})
@@ -169,7 +169,6 @@
 			variant="default"
 			size="xs"
 			on:click={handleRefreshInstallations}
-			disabled={!$enterpriseLicense}
 			startIcon={{ icon: RotateCw }}
 		/>
 	{:else}
@@ -179,21 +178,21 @@
 		<Popover
 			documentationLink="https://www.windmill.dev/docs/integrations/git_repository#github-app"
 			bind:this={githubAppPopover}
-			disabled={!$enterpriseLicense || githubState.loadingGithubInstallations}
+			disabled={githubState.loadingGithubInstallations}
 			contentClasses="overflow-auto"
 		>
 			{#snippet trigger()}
 				<Button
 					variant="default"
 					size="xs"
-					disabled={!$enterpriseLicense || githubState.loadingGithubInstallations}
+					disabled={githubState.loadingGithubInstallations}
 					startIcon={{
 						icon: githubState.loadingGithubInstallations ? Loader2 : Github,
 						classes: githubState.loadingGithubInstallations ? 'animate-spin' : ''
 					}}
 					nonCaptureEvent
 				>
-					{$enterpriseLicense ? 'GitHub App' : 'GitHub App (ee only)'}
+					GitHub App
 				</Button>
 			{/snippet}
 			{#snippet content({ close })}
@@ -462,7 +461,7 @@
 		<Button
 			variant="default"
 			size="xs"
-			disabled={!$enterpriseLicense || githubState.loadingGithubInstallations}
+			disabled={githubState.loadingGithubInstallations}
 			startIcon={{
 				icon:
 					githubState.loadingGithubInstallations || githubState.isCheckingInstallation
@@ -477,11 +476,7 @@
 			target="_blank"
 			on:click={handleInstallClickWithPopover}
 		>
-			{$enterpriseLicense
-				? githubState.isCheckingInstallation
-					? 'Waiting for installation...'
-					: 'Install GitHub App'
-				: 'GitHub App (ee only)'}
+			{githubState.isCheckingInstallation ? 'Waiting for installation...' : 'Install GitHub App'}
 		</Button>
 	{/if}
 {/if}

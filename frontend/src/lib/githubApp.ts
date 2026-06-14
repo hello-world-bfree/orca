@@ -158,13 +158,15 @@ export async function loadGithubInstallations(
 						: ghesConfig.app_slug
 				state.githubInstallationUrl = `${ghesBaseUrl}/${appsPath}/${appPath}/installations/new?state=${stateParam}`
 			} else {
+				// OSS deviation: no hosted Windmill GitHub App on self-host. Configure a self-managed
+				// app in instance settings to get an installation URL (handled above).
 				state.isGhesSelfManaged = false
-				state.githubInstallationUrl = `https://github.com/apps/windmill-sync-helper/installations/new?state=${stateParam}`
+				state.githubInstallationUrl = undefined
 			}
 		} catch {
-			// No GHES config — use default github.com URL
+			// No GitHub App configured — nothing to install against on a self-hosted instance.
 			state.isGhesSelfManaged = false
-			state.githubInstallationUrl = `https://github.com/apps/windmill-sync-helper/installations/new?state=${stateParam}`
+			state.githubInstallationUrl = undefined
 		}
 	} catch (err) {
 		const githubError = handleGitHubAppError(err, 'load installations')

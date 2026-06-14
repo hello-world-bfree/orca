@@ -811,7 +811,7 @@
 				{:else if setting.fieldType == 'secret_backend'}
 					<SecretBackendConfig {values} disabled={loading} />
 				{:else if setting.fieldType == 'github_enterprise_app'}
-					<GhesAppSettings {values} disabled={loading || !$enterpriseLicense} />
+					<GhesAppSettings {values} disabled={loading} />
 				{:else if setting.fieldType == 'ws_connectivity'}
 					<WsConnectivityTest {values} />
 				{/if}
