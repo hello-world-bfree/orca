@@ -592,7 +592,7 @@ rdkafka-sys = "=4.9.0"
 pg_escape = "0.1.1"
 async-nats = "0.38.0"
 nkeys = "0.4.4"
-nu-parser = { version = "0.101.0", default-features = false }
+nu-parser = { version = "0.113.1", default-features = false }
 globset = "0.4.16"
 croner = "2.2.0"
 rmcp = { version = "=0.15.0", features = ["client", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
