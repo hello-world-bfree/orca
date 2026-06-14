@@ -3591,7 +3591,7 @@ dependencies = [
  "deno_error 0.6.1",
  "deno_fs",
  "deno_path_util",
- "deno_permissions",
+ "deno_permissions 0.68.0",
  "deno_tls",
  "dyn-clone",
  "error_reporter",
@@ -3631,7 +3631,7 @@ dependencies = [
  "deno_error 0.6.1",
  "deno_io",
  "deno_path_util",
- "deno_permissions",
+ "deno_permissions 0.68.0",
  "filetime",
  "junction",
  "libc",
@@ -3703,7 +3703,7 @@ dependencies = [
  "deno_core",
  "deno_error 0.6.1",
  "deno_features",
- "deno_permissions",
+ "deno_permissions 0.68.0",
  "deno_tls",
  "hickory-proto",
  "hickory-resolver",
@@ -3755,6 +3755,35 @@ name = "deno_permissions"
 version = "0.68.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baa14d9c3fbba59836ffbaac7f736a2f48d4a5fc209a2103d1e1b898915232a5"
+dependencies = [
+ "capacity_builder",
+ "deno_error 0.6.1",
+ "deno_path_util",
+ "deno_terminal",
+ "deno_unsync",
+ "fqdn",
+ "ipnetwork",
+ "libc",
+ "log",
+ "nix 0.27.1",
+ "once_cell",
+ "parking_lot",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "sys_traits",
+ "temp_deno_which",
+ "thiserror 2.0.18",
+ "url",
+ "winapi",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "deno_permissions"
+version = "0.69.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e47a9b5ff68cab3d692a94c903e0365f3ec86b58a11659c849e2cdd6fd654bfb"
 dependencies = [
  "capacity_builder",
  "deno_error 0.6.1",
@@ -3880,7 +3909,7 @@ dependencies = [
  "bytes",
  "deno_core",
  "deno_error 0.6.1",
- "deno_permissions",
+ "deno_permissions 0.68.0",
  "encoding_rs",
  "flate2",
  "futures",
@@ -15186,7 +15215,7 @@ dependencies = [
  "deno_fs",
  "deno_io",
  "deno_net",
- "deno_permissions",
+ "deno_permissions 0.69.0",
  "deno_telemetry",
  "deno_tls",
  "deno_url",

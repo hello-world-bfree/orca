@@ -496,7 +496,7 @@ deno_fs = "0.119.0"
 deno_net = "0.201.0"
 deno_core = "0.352.0"
 deno_ast = { version = "=0.51.0", features = ["transpiling"] }
-deno_permissions = "0.68.0"
+deno_permissions = "0.69.0"
 deno_telemetry = "0.31.0"
 deno_error = "=0.6.1"
 rustls-pemfile = "2.2.0"
