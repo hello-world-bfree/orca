@@ -16,6 +16,9 @@ prometheus = ["dep:prometheus"]
 benchmark = []
 parquet = []
 aws_auth = ["dep:aws-sdk-sts", "dep:aws-config"]
+# OSS deviation: our own AGPL impl of the AWS Secrets Manager secret backend
+# (upstream ships this only under `private`). Pulls the SDK without enabling EE.
+aws_secrets_manager = ["dep:aws-sdk-secretsmanager", "dep:aws-config"]
 otel = ["dep:opentelemetry-semantic-conventions", "dep:opentelemetry-otlp", "dep:opentelemetry_sdk",
     "dep:tracing-opentelemetry", "dep:opentelemetry-appender-tracing", "dep:tonic", "dep:opentelemetry"]
 smtp = ["dep:mail-send"]

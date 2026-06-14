@@ -142,6 +142,8 @@ bedrock = ["windmill-ai/bedrock", "windmill-api/bedrock", "windmill-worker/bedro
 mqtt_trigger = ["windmill-api/mqtt_trigger"]
 native_trigger = ["windmill-api/native_trigger"]
 sqs_trigger = ["windmill-api/sqs_trigger", "windmill-common/aws_auth", "windmill-api/openidconnect"]
+# OSS deviation: own AGPL impl of the AWS Secrets Manager secret backend (upstream EE-only).
+aws_secrets_manager = ["windmill-common/aws_secrets_manager"]
 gcp_trigger = ["windmill-api/gcp_trigger"]
 azure_trigger = ["windmill-api/azure_trigger"]
 smtp = ["windmill-api/smtp", "windmill-common/smtp", "windmill-queue/smtp"]
@@ -181,7 +183,7 @@ oss_core = [
     "http_trigger", "zip", "oauth2", "postgres_trigger",
     "mqtt_trigger", "websocket", "smtp", "native_trigger",
     "static_frontend", "mcp", "bedrock", "run_inline",
-    "quickjs"
+    "quickjs", "aws_secrets_manager"
 ]
 ce_core = ["oss_core", "private", "operator"]
 ee_core = [

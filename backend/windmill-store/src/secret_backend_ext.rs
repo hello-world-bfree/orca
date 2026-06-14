@@ -35,6 +35,27 @@ use windmill_common::{
 #[cfg(all(feature = "private", feature = "enterprise"))]
 use tokio::sync::RwLock;
 
+// OSS deviation: imports + cache for our own AWS Secrets Manager secret backend,
+// so the OSS build can dispatch secret reads/writes to AWS SM (not just the DB).
+#[cfg(not(all(feature = "private", feature = "enterprise")))]
+use tokio::sync::RwLock;
+#[cfg(not(all(feature = "private", feature = "enterprise")))]
+use windmill_common::{
+    global_settings::{load_value_from_global_settings, SECRET_BACKEND_SETTING},
+    secret_backend::{AwsSecretsManagerBackend, AwsSecretsManagerSettings, SecretBackendConfig},
+};
+
+#[cfg(not(all(feature = "private", feature = "enterprise")))]
+struct CachedOssAwsSmBackend {
+    backend: Arc<dyn SecretBackend>,
+    settings: AwsSecretsManagerSettings,
+}
+
+#[cfg(not(all(feature = "private", feature = "enterprise")))]
+lazy_static::lazy_static! {
+    static ref OSS_AWS_SM_BACKEND_CACHE: RwLock<Option<CachedOssAwsSmBackend>> = RwLock::new(None);
+}
+
 // Cached Vault backend to avoid recreating it for every request
 // This enables connection pooling and avoids repeated setup overhead
 #[cfg(all(feature = "private", feature = "enterprise"))]
@@ -77,7 +98,53 @@ lazy_static::lazy_static! {
 /// EE: Returns configured backend (Database or Vault)
 #[cfg(not(all(feature = "private", feature = "enterprise")))]
 pub async fn get_secret_backend(db: &DB) -> Result<Arc<dyn SecretBackend>> {
-    Ok(Arc::new(DatabaseBackend::new(db.clone())))
+    let config = match load_value_from_global_settings(db, SECRET_BACKEND_SETTING).await? {
+        Some(value) => serde_json::from_value::<SecretBackendConfig>(value).unwrap_or_default(),
+        None => SecretBackendConfig::default(),
+    };
+
+    match config {
+        SecretBackendConfig::Database => Ok(Arc::new(DatabaseBackend::new(db.clone()))),
+        SecretBackendConfig::AwsSecretsManager(settings) => {
+            get_or_create_oss_aws_sm_backend(settings).await
+        }
+        SecretBackendConfig::HashiCorpVault(_) | SecretBackendConfig::AzureKeyVault(_) => {
+            Err(Error::internal_err(
+                "HashiCorp Vault and Azure Key Vault secret backends require Enterprise Edition; \
+                 only Database and AWS Secrets Manager are available in this build"
+                    .to_string(),
+            ))
+        }
+    }
+}
+
+#[cfg(not(all(feature = "private", feature = "enterprise")))]
+async fn get_or_create_oss_aws_sm_backend(
+    settings: AwsSecretsManagerSettings,
+) -> Result<Arc<dyn SecretBackend>> {
+    {
+        let cache = OSS_AWS_SM_BACKEND_CACHE.read().await;
+        if let Some(ref cached) = *cache {
+            if cached.settings == settings {
+                return Ok(cached.backend.clone());
+            }
+        }
+    }
+
+    let mut cache = OSS_AWS_SM_BACKEND_CACHE.write().await;
+
+    if let Some(ref cached) = *cache {
+        if cached.settings == settings {
+            return Ok(cached.backend.clone());
+        }
+    }
+
+    let backend: Arc<dyn SecretBackend> =
+        Arc::new(AwsSecretsManagerBackend::new_with_client(settings.clone()).await?);
+
+    *cache = Some(CachedOssAwsSmBackend { backend: backend.clone(), settings });
+
+    Ok(backend)
 }
 
 #[cfg(all(feature = "private", feature = "enterprise"))]
@@ -217,8 +284,13 @@ async fn get_or_create_aws_sm_backend(
 /// OSS: Always returns false
 /// EE: Checks global settings
 #[cfg(not(all(feature = "private", feature = "enterprise")))]
-pub async fn is_vault_backend_configured(_db: &DB) -> Result<bool> {
-    Ok(false)
+pub async fn is_vault_backend_configured(db: &DB) -> Result<bool> {
+    let config = match load_value_from_global_settings(db, SECRET_BACKEND_SETTING).await? {
+        Some(value) => serde_json::from_value::<SecretBackendConfig>(value).unwrap_or_default(),
+        None => SecretBackendConfig::default(),
+    };
+
+    Ok(matches!(config, SecretBackendConfig::AwsSecretsManager(_)))
 }
 
 #[cfg(all(feature = "private", feature = "enterprise"))]

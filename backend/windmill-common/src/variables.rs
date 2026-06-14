@@ -216,7 +216,9 @@ pub async fn get_secret_value_as_admin(
 
     let r = if variable.is_secret {
         let value = variable.value;
-        if !value.is_empty() {
+        if value.starts_with("$aws_sm:") {
+            crate::secret_backend::fetch_from_external_backend(db, w_id, path).await?
+        } else if !value.is_empty() {
             let mc = build_crypt(db, w_id).await?;
             decrypt(&mc, value).map_err(|e| {
                 crate::error::Error::internal_err(format!(
@@ -529,10 +531,14 @@ pub async fn get_variable_or_self(
     if let Some(record) = record {
         let mut value = record.value;
         if record.is_secret {
-            let mc = build_crypt(db, w_id).await?;
-            value = decrypt(&mc, value).map_err(|e| {
-                Error::internal_err(format!("Error decrypting variable {}: {}", path, e))
-            })?;
+            value = if value.starts_with("$aws_sm:") {
+                crate::secret_backend::fetch_from_external_backend(db, w_id, &path).await?
+            } else {
+                let mc = build_crypt(db, w_id).await?;
+                decrypt(&mc, value).map_err(|e| {
+                    Error::internal_err(format!("Error decrypting variable {}: {}", path, e))
+                })?
+            };
         }
 
         Ok(value)
@@ -574,10 +580,14 @@ pub async fn get_variable_or_self_as<T: Authable + Sync>(
     if let Some(record) = record {
         let mut value = record.value;
         if record.is_secret {
-            let mc = build_crypt(db, w_id).await?;
-            value = decrypt(&mc, value).map_err(|e| {
-                Error::internal_err(format!("Error decrypting variable {}: {}", var_path, e))
-            })?;
+            value = if value.starts_with("$aws_sm:") {
+                crate::secret_backend::fetch_from_external_backend(db, w_id, &var_path).await?
+            } else {
+                let mc = build_crypt(db, w_id).await?;
+                decrypt(&mc, value).map_err(|e| {
+                    Error::internal_err(format!("Error decrypting variable {}: {}", var_path, e))
+                })?
+            };
         }
 
         Ok(value)

@@ -54,14 +54,13 @@
 	let migrateFromAwsSmModalOpen = $state(false)
 
 	let vaultDisabled = $derived(!$enterpriseLicense)
+	// OSS deviation: AWS Secrets Manager is implemented in this fork, so it does not
+	// require an enterprise license (HashiCorp Vault / Azure Key Vault stay EE-only).
+	let awsSmDisabled = $derived(false)
 
 	function setBackendType(type: string | undefined) {
 		if (!type) return
-		if (
-			(type === 'HashiCorpVault' || type === 'AzureKeyVault' || type === 'AwsSecretsManager') &&
-			vaultDisabled
-		)
-			return
+		if ((type === 'HashiCorpVault' || type === 'AzureKeyVault') && vaultDisabled) return
 		if (type === 'Database') {
 			$values['secret_backend'] = { type: 'Database' }
 		} else if (type === 'HashiCorpVault') {
@@ -428,17 +427,15 @@
 				<ToggleButton
 					value="AwsSecretsManager"
 					label="AWS Secrets Manager"
-					tooltip={vaultDisabled
-						? 'Requires Enterprise Edition'
-						: 'Store secrets in AWS Secrets Manager'}
+					tooltip="Store secrets in AWS Secrets Manager"
 					item={toggleButton}
-					disabled={vaultDisabled}
+					disabled={awsSmDisabled}
 				/>
 			{/snippet}
 		</ToggleButtonGroup>
 		{#if vaultDisabled}
 			<div class="flex items-center gap-1">
-				<EEOnly>External secret store integrations require Enterprise Edition</EEOnly>
+				<EEOnly>HashiCorp Vault and Azure Key Vault integrations require Enterprise Edition</EEOnly>
 			</div>
 		{/if}
 	</div>

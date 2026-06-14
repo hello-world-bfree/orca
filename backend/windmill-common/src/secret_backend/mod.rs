@@ -209,3 +209,32 @@ pub struct SecretMigrationFailure {
     /// Error message
     pub error: String,
 }
+
+// OSS deviation: resolve a secret whose DB value is an external-backend marker
+// (`$aws_sm:<path>`) by fetching it from the configured external secret backend.
+// The windmill-common DB-direct secret readers use this because they cannot reach
+// the windmill-store backend dispatch (crate dependency direction).
+pub async fn fetch_from_external_backend(
+    db: &crate::db::DB,
+    workspace_id: &str,
+    path: &str,
+) -> Result<String> {
+    use crate::global_settings::{load_value_from_global_settings, SECRET_BACKEND_SETTING};
+
+    let config = match load_value_from_global_settings(db, SECRET_BACKEND_SETTING).await? {
+        Some(value) => serde_json::from_value::<SecretBackendConfig>(value).unwrap_or_default(),
+        None => SecretBackendConfig::default(),
+    };
+
+    match config {
+        SecretBackendConfig::AwsSecretsManager(settings) => {
+            let backend = AwsSecretsManagerBackend::new_with_client(settings).await?;
+            backend.get_secret(workspace_id, path).await
+        }
+        _ => Err(crate::error::Error::internal_err(format!(
+            "secret variable {} is stored in an external backend that is not \
+             configured or supported in this build",
+            path
+        ))),
+    }
+}

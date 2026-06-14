@@ -842,12 +842,11 @@ export const settings: Record<string, Setting[]> = {
 		{
 			label: 'Backend type',
 			description:
-				'By default, secrets are encrypted and stored in the database. Enterprise Edition supports HashiCorp Vault, Azure Key Vault, and AWS Secrets Manager as external secret backends.',
+				'By default, secrets are encrypted and stored in the database. AWS Secrets Manager is supported as an external secret backend; HashiCorp Vault and Azure Key Vault require Enterprise Edition.',
 			key: 'secret_backend',
 			fieldType: 'secret_backend',
 			storage: 'setting',
-			ee_only:
-				'HashiCorp Vault, Azure Key Vault, and AWS Secrets Manager integrations are Enterprise Edition features'
+			ee_only: 'HashiCorp Vault and Azure Key Vault integrations are Enterprise Edition features'
 		}
 	],
 	'GitHub App': [
