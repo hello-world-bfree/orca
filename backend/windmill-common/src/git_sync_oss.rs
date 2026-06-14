@@ -28,13 +28,13 @@ struct GithubAppConfig {
 }
 
 #[cfg(not(feature = "private"))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 struct InstallationRow {
     installation_id: i64,
     account_id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     github_base_url: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     provisioned_by_admin: Option<bool>,
 }
 
@@ -408,6 +408,172 @@ pub async fn get_ghes_config(
         })),
         _ => Ok(None),
     }
+}
+
+#[cfg(not(feature = "private"))]
+async fn write_workspace_installations(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installations: &[InstallationRow],
+) -> crate::error::Result<()> {
+    sqlx::query("UPDATE workspace_settings SET git_app_installations = $1 WHERE workspace_id = $2")
+        .bind(sqlx::types::Json(installations))
+        .bind(w_id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+// Appends (or replaces by installation_id) an installation on a workspace.
+#[cfg(not(feature = "private"))]
+pub async fn add_installation_to_workspace(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+    account_id: String,
+    github_base_url: Option<String>,
+    provisioned_by_admin: bool,
+) -> crate::error::Result<()> {
+    let mut installations = workspace_installations(db, w_id).await?;
+    installations.retain(|i| i.installation_id != installation_id);
+    installations.push(InstallationRow {
+        installation_id,
+        account_id,
+        github_base_url,
+        provisioned_by_admin: if provisioned_by_admin {
+            Some(true)
+        } else {
+            None
+        },
+    });
+    write_workspace_installations(db, w_id, &installations).await
+}
+
+// Removes an installation from a workspace. Admin-provisioned installs can only be removed by a
+// super-admin (workspace admins must not be able to drop instance-managed installations).
+#[cfg(not(feature = "private"))]
+pub async fn remove_installation_from_workspace(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+    caller_is_super_admin: bool,
+) -> crate::error::Result<()> {
+    let installations = workspace_installations(db, w_id).await?;
+    match installations
+        .iter()
+        .find(|i| i.installation_id == installation_id)
+    {
+        None => {
+            return Err(Error::NotFound(format!(
+                "installation {installation_id} not found in workspace {w_id}"
+            )))
+        }
+        Some(target) if target.provisioned_by_admin.unwrap_or(false) && !caller_is_super_admin => {
+            return Err(Error::BadRequest(
+                "This installation was provisioned by an instance admin and cannot be removed here"
+                    .to_string(),
+            ))
+        }
+        Some(_) => {}
+    }
+    let remaining: Vec<InstallationRow> = installations
+        .into_iter()
+        .filter(|i| i.installation_id != installation_id)
+        .collect();
+    write_workspace_installations(db, w_id, &remaining).await
+}
+
+// Copies an installation from one workspace into another (workspace-initiated → not admin-provisioned).
+#[cfg(not(feature = "private"))]
+pub async fn copy_installation_to_workspace(
+    db: &Pool<Postgres>,
+    source_w_id: &str,
+    target_w_id: &str,
+    installation_id: i64,
+) -> crate::error::Result<()> {
+    let source = workspace_installations(db, source_w_id).await?;
+    let row = source
+        .into_iter()
+        .find(|i| i.installation_id == installation_id)
+        .ok_or_else(|| {
+            Error::NotFound(format!(
+                "installation {installation_id} not found in workspace {source_w_id}"
+            ))
+        })?;
+    add_installation_to_workspace(
+        db,
+        target_w_id,
+        row.installation_id,
+        row.account_id,
+        row.github_base_url,
+        false,
+    )
+    .await
+}
+
+#[cfg(not(feature = "private"))]
+async fn fetch_installation_account(
+    config: &GithubAppConfig,
+    installation_id: i64,
+    base_url_override: Option<&str>,
+) -> crate::error::Result<String> {
+    let app_jwt = create_app_jwt(config)?;
+    let api_base = github_api_base(base_url_override.or(config.base_url.as_deref()));
+
+    let resp = reqwest::Client::new()
+        .get(format!("{api_base}/app/installations/{installation_id}"))
+        .header("Authorization", format!("Bearer {app_jwt}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "windmill")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(to_anyhow)?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(Error::internal_err(format!(
+            "GitHub get-installation failed ({status}): {body}"
+        )));
+    }
+
+    #[derive(Deserialize)]
+    struct Account {
+        login: String,
+    }
+    #[derive(Deserialize)]
+    struct Installation {
+        account: Account,
+    }
+    let parsed: Installation = resp.json().await.map_err(to_anyhow)?;
+    Ok(parsed.account.login)
+}
+
+// Registers a freshly-created installation on a workspace: resolves its GitHub account via the API,
+// stores the configured GHES base URL on the row (so token minting later targets the right host).
+#[cfg(not(feature = "private"))]
+pub async fn register_installation(
+    db: &Pool<Postgres>,
+    w_id: &str,
+    installation_id: i64,
+) -> crate::error::Result<()> {
+    let config = load_github_app_config(db).await?;
+    let github_base_url = config.base_url.clone().filter(|b| {
+        let b = b.trim_end_matches('/');
+        b != "https://github.com" && b != "http://github.com"
+    });
+    let account_id =
+        fetch_installation_account(&config, installation_id, github_base_url.as_deref()).await?;
+    add_installation_to_workspace(
+        db,
+        w_id,
+        installation_id,
+        account_id,
+        github_base_url,
+        false,
+    )
+    .await
 }
 
 pub fn prepend_token_to_github_url(
